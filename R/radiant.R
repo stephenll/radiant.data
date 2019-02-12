@@ -132,7 +132,7 @@ install_webshot <- function() {
 #' @param value Value to set
 #
 #' @examples
-#' foo <- data.frame(price = 1:5) %>% set_attr("desc", "price set in experiment ...")
+#' foo <- data.frame(price = 1:5) %>% set_attr("description", "price set in experiment ...")
 #'
 #' @export
 set_attr <- function(x, which, value) `attr<-`(x, which, value)
@@ -262,13 +262,13 @@ to_fct <- function(dataset, safx = 30, nuniq = 100, n = 100) {
     (nobs <= n && nd < nobs) || (nd <= nuniq && (nd / nobs < (1 / safx)))
   }
   toFct <- select(dataset, which(isChar)) %>%
-    summarise_all(funs(fab)) %>%
+    summarise_all(fab) %>%
     select(which(. == TRUE)) %>%
     names()
   if (length(toFct) == 0) {
     dataset
   } else {
-    mutate_at(dataset, .vars = toFct, .funs = funs(as.factor))
+    mutate_at(dataset, .vars = toFct, .funs = as.factor)
   }
 }
 
@@ -640,7 +640,7 @@ format_df <- function(tbl, dec = NULL, perc = FALSE, mark = "", na.rm = FALSE, .
       x
     }
   }
-  mutate_all(tbl, .funs = funs(frm))
+  mutate_all(tbl, .funs = frm)
 }
 
 #' Format a number with a specified number of decimal places, thousand sep, and a symbol
@@ -692,7 +692,7 @@ format_nr <- function(
 #'
 #' @export
 round_df <- function(tbl, dec = 3) {
-  mutate_if(tbl, is_double, .funs = funs(round(., dec)))
+  mutate_if(tbl, is_double, .funs = ~ round(., dec))
 }
 
 #' Find Dropbox folder
@@ -1227,6 +1227,8 @@ describe <- function(dataset) {
 #' @param text Text to be parsed
 #' @param all Should all non-ascii characters be removed? Default is FALSE
 #'
+#' @importFrom stringi stri_trans_general
+#'
 #' @export
 fix_smart <- function(text, all = FALSE) {
 
@@ -1235,20 +1237,11 @@ fix_smart <- function(text, all = FALSE) {
     gsub("[\x80-\xFF]", "", text)
   } else {
     ## based on https://stackoverflow.com/a/1262210/1974918
-    gsub("\xC2\xAB", '"', text) %>%
-      gsub("\xC2\xBB", '"', .) %>%
-      gsub("\xE2\x80\x98", "'", .) %>%
-      gsub("\xE2\x80\x99", "'", .) %>%
-      gsub("\xE2\x80\x9A", "'", .) %>%
-      gsub("\xE2\x80\x9B", "'", .) %>%
-      gsub("\xE2\x80\x9C", '"', .) %>%
-      gsub("\xE2\x80\x9D", '"', .) %>%
-      gsub("\xE2\x80\x9E", '"', .) %>%
-      gsub("\xE2\x80\x9F", '"', .) %>%
-      gsub("\xE2\x80\xB9", "'", .) %>%
-      gsub("\xE2\x80\xBA", "'", .) %>%
-      gsub("\xE2\x80\x93", "-", .) %>%
-      gsub("\r", "\n", .) %>%
+    ## based on https://stackoverflow.com/a/54467895/1974918
+    stringi::stri_trans_general(text, "ascii") %>%
+      gsub("[\x95\xE2\x80\xA2]", "*", .) %>%
+      # gsub("\u2022", "*", .) %>%
+      gsub("\r\n", "\n", .) %>%
       gsub("\f", "\n", .)
   }
 }
@@ -1479,12 +1472,14 @@ read_files <- function(
     ## waiting for https://github.com/wesm/feather/pull/326
     # cmd <- paste0(to, " <- feather::read_feather(", pp$rpath, ", columns = c())\nregister(\"", pp$objname, "\", desc = feather::feather_metadata(\"", pp$rpath, "\")$description)")
     cmd <- glue('{to} <- feather::read_feather({pp$rpath}, columns = c())\nregister("{pp$objname}")')
+  } else if (pp$fext %in% c("dta", "sav", "sas7bdat")) {
+    cmd <- glue('{to} <- rio::import({pp$rpath})\nregister("{pp$objname}")')
   } else if (pp$fext == "yaml") {
     cmd <- glue('{to} <- yaml::yaml.load_file({pp$rpath})\nregister("{pp$objname}")')
   } else if (grepl("sqlite", pp$fext)) {
     obj <- glue('{pp$objname}_tab1')
     cmd <- "## see https://db.rstudio.com/dplyr/\n" %>%
-        glue('library(DBI)\ncon <- dbConnect(RSQLite::SQLite(), dbname = {pp$rpath})\n(tables <- dbListTables(con))\n{obj} <- dplyr::tbl(con, from = tables[1]) %>% collect()\nregister("{obj}")')
+        glue('library(DBI)\ncon <- dbConnect(RSQLite::SQLite(), dbname = {pp$rpath})\n(tables <- dbListTables(con))\n{obj} <- dplyr::tbl(con, from = tables[1]) %>% collect()\ndbDisconnect(con)\nregister("{obj}")')
   } else if (pp$fext == "sql") {
     if (type == "rmd")  {
       cmd <- "/* see http://rmarkdown.rstudio.com/authoring_knitr_engines.html */\n" %>%

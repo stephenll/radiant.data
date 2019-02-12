@@ -1,5 +1,14 @@
-# radiant.data 0.9.8.3
+# radiant.data 0.9.8.7
 
+* Various fixes to address breaking changes in dplyr 0.8.0
+* Added `radiant_` prefix to all attributes, except `description`, to avoid conflicts with other packages (e.g., `vars` in dplyr)
+
+# radiant.data 0.9.8.6
+
+* Use `stringi::stri_trans_general` to replace special symbols in Rmarkdown that may cause problems
+* Add empty line before and after code chunks when saving reports to Rmarkdown
+* Use `rio` to load `sav`, `dta`, or `sas7bdat` files through the `read files` button in _Report > Rmd_ and _Report > R_.
+* Create a `qscatter` plot similar to the function of the same name in Stata
 * New radiant icon
 * Fix for setting where both `xlim` and `ylim` are set in `visualize` function 
 * Use an expandable `shinyAce` input for the R-code log in _Data > Transform_
